@@ -24,19 +24,17 @@ import ActivitySuggestions from './pages/ActivitySuggestions';
 import Verification from './pages/Verification';
 import Admin from './pages/Admin';
 
-// Auth0 configuration
-const auth0Domain = import.meta.env.REACT_APP_AUTH0_DOMAIN || '';
-const auth0ClientId = import.meta.env.REACT_APP_AUTH0_CLIENT_ID || '';
-const auth0Audience = import.meta.env.REACT_APP_AUTH0_AUDIENCE || '';
+
 
 function App() {
   return (
     <Auth0Provider
-      domain={auth0Domain}
-      clientId={auth0ClientId}
+      domain={import.meta.env.VITE_AUTH0_DOMAIN}
+      clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
       authorizationParams={{
         redirect_uri: window.location.origin,
-        audience: auth0Audience
+        audience: import.meta.env.VITE_AUTH0_AUDIENCE,  // "https://buddyup-api"
+        scope: 'openid profile email'
       }}
     >
       <AuthProvider>
@@ -52,59 +50,59 @@ function App() {
                         {/* Public routes */}
                         <Route path="/" element={<Home />} />
                         <Route path="/login" element={<Login />} />
-                        
+
                         {/* Protected routes */}
-                        <Route 
-                          path="/profile" 
+                        <Route
+                          path="/profile"
                           element={
                             <ProtectedRoute>
                               <Profile />
                             </ProtectedRoute>
-                          } 
+                          }
                         />
-                        <Route 
-                          path="/find-buddies" 
+                        <Route
+                          path="/find-buddies"
                           element={
                             <ProtectedRoute>
                               <FindBuddies />
                             </ProtectedRoute>
-                          } 
+                          }
                         />
-                        <Route 
-                          path="/messages" 
+                        <Route
+                          path="/messages"
                           element={
                             <ProtectedRoute>
                               <Messages />
                             </ProtectedRoute>
-                          } 
+                          }
                         />
-                        <Route 
-                          path="/activities" 
+                        <Route
+                          path="/activities"
                           element={
                             <ProtectedRoute>
                               <ActivitySuggestions />
                             </ProtectedRoute>
-                          } 
+                          }
                         />
-                        <Route 
-                          path="/verification" 
+                        <Route
+                          path="/verification"
                           element={
                             <ProtectedRoute>
                               <Verification />
                             </ProtectedRoute>
-                          } 
+                          }
                         />
-                        
+
                         {/* Admin routes */}
-                        <Route 
-                          path="/admin/*" 
+                        <Route
+                          path="/admin/*"
                           element={
                             <ProtectedRoute adminOnly>
                               <Admin />
                             </ProtectedRoute>
-                          } 
+                          }
                         />
-                        
+
                         {/* Fallback route */}
                         <Route path="*" element={<Navigate to="/" replace />} />
                       </Routes>

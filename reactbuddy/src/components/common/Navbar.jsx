@@ -29,7 +29,8 @@ const Navbar = () => {
         ...(isAdmin ? [{ path: '/admin', label: 'Admin' }] : []),
       ]
     : [
-        '',
+        // Provide public navigation links here or leave as empty array
+        // For example: { path: '/about', label: 'About' }
       ];
 
   return (

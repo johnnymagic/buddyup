@@ -3,13 +3,16 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Routing;
 using BuddyUp.API.Models.Domain;
 using BuddyUp.API.Models.DTOs;
 using BuddyUp.API.Models.Responses;
 using BuddyUp.API.Services.Interfaces;
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using NetTopologySuite.Geometries;
 
 namespace BuddyUp.API.Controllers
 {
@@ -20,9 +23,11 @@ namespace BuddyUp.API.Controllers
     {
         private readonly IProfileService _profileService;
         private readonly IUserService _userService;
-
-        public ProfileController(IProfileService profileService, IUserService userService)
+        private readonly ILogger<ProfileController> _logger;
+        public ProfileController(IProfileService profileService, IUserService userService, ILogger<ProfileController> logger)
         {
+
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _profileService = profileService ?? throw new ArgumentNullException(nameof(profileService));
             _userService = userService ?? throw new ArgumentNullException(nameof(userService));
         }
@@ -30,16 +35,19 @@ namespace BuddyUp.API.Controllers
         /// <summary>
         /// Get the current user's profile
         /// </summary>
+        /// <summary>
+        /// Get the current user's profile
+        /// </summary>
         [HttpGet]
         public async Task<ActionResult<ProfileDto>> GetProfile()
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            var auth0UserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(auth0UserId))
             {
-                return Unauthorized(new { Success = false, Message = "User not authenticated" });
+                return Unauthorized(new ApiResponse { Success = false, Message = "User not authenticated" });
             }
 
-            var profile = await _profileService.GetProfileByUserId(userId);
+            var profile = await _profileService.GetByAuth0Id(auth0UserId);
             if (profile == null)
             {
                 return NotFound(new ApiResponse { Success = false, Message = "Profile not found" });
@@ -48,68 +56,200 @@ namespace BuddyUp.API.Controllers
             return Ok(profile);
         }
 
-        /// <summary>
-        /// Create or update the user's profile
-        /// </summary>
-        [HttpPost]
-        public async Task<ActionResult<ProfileDto>> CreateProfile([FromBody] ProfileDto profileDto)
+        // Fix for the ProfileController UpsertProfile method
+
+      
+        [HttpPut]
+        public async Task<ActionResult<ProfileDto>> UpsertProfile([FromBody] ProfileUpdateInputDto inputDto)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            if (inputDto == null)
+            {
+                return BadRequest(new ApiResponse { Success = false, Message = "Profile data is required" });
+            }
+
+            // Get the Auth0 user ID from the token
+            var auth0UserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(auth0UserId))
             {
                 return Unauthorized(new ApiResponse { Success = false, Message = "User not authenticated" });
             }
 
+            _logger.LogInformation($"Upserting profile for Auth0 user: {auth0UserId}");
+
+            try
+            {
+                // Check if profile already exists
+                var existingProfile = await _profileService.GetByAuth0Id(auth0UserId);
+                ProfileDto result;
+
+                if (existingProfile == null)
+                {
+                    // Profile doesn't exist - create a new one
+                    _logger.LogInformation($"Profile not found, creating new profile for Auth0 user: {auth0UserId}");
+
+                    var profileDto = new ProfileDto
+                    {
+                        Auth0UserId = auth0UserId,
+                        Email = inputDto.Email,
+                        FirstName = inputDto.FirstName,
+                        LastName = inputDto.LastName,
+                        Bio = inputDto.Bio ?? string.Empty,
+                        ProfilePictureUrl = inputDto.ProfilePictureUrl ?? string.Empty,
+                        MaxTravelDistance = inputDto.MaxTravelDistance,
+                        PreferredDays = inputDto.PreferredDays ?? new List<string>(),
+                        PreferredTimes = inputDto.PreferredTimes ?? new List<string>(),
+                        PublicProfile = inputDto.PublicProfile
+                    };
+
+                    // Set location if provided
+                    if (inputDto.Latitude.HasValue && inputDto.Longitude.HasValue)
+                    {
+                        profileDto.Latitude = inputDto.Latitude;
+                        profileDto.Longitude = inputDto.Longitude;
+                    }
+
+                    result = await _profileService.CreateProfile(profileDto);
+                    _logger.LogInformation($"Created new profile with ID {result.ProfileId}");
+                }
+                else
+                {
+                    // Profile exists - update it
+                    _logger.LogInformation($"Updating existing profile for Auth0 user: {auth0UserId}");
+
+                    existingProfile.FirstName = inputDto.FirstName ?? existingProfile.FirstName;
+                    existingProfile.LastName = inputDto.LastName ?? existingProfile.LastName;
+                    existingProfile.Email = inputDto.Email ?? existingProfile.Email;
+                    existingProfile.Bio = inputDto.Bio ?? existingProfile.Bio;
+                    existingProfile.ProfilePictureUrl = inputDto.ProfilePictureUrl ?? existingProfile.ProfilePictureUrl;
+                    existingProfile.MaxTravelDistance = inputDto.MaxTravelDistance;
+                    existingProfile.PreferredDays = inputDto.PreferredDays ?? existingProfile.PreferredDays;
+                    existingProfile.PreferredTimes = inputDto.PreferredTimes ?? existingProfile.PreferredTimes;
+                    existingProfile.PublicProfile = inputDto.PublicProfile;
+
+                    // Update location if provided
+                    if (inputDto.Latitude.HasValue && inputDto.Longitude.HasValue)
+                    {
+                        existingProfile.Latitude = inputDto.Latitude;
+                        existingProfile.Longitude = inputDto.Longitude;
+                    }
+
+                    result = await _profileService.UpdateProfile(existingProfile);
+                    _logger.LogInformation($"Updated existing profile with ID {result.ProfileId}");
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error upserting profile for Auth0 user {auth0UserId}");
+                return StatusCode(500, new ApiResponse
+                {
+                    Success = false,
+                    Message = $"Failed to upsert profile: {ex.Message}"
+                });
+            }
+        }
+
+       
+
+        [HttpPost]
+        public async Task<ActionResult<ProfileDto>> CreateProfile([FromBody] ProfileUpdateInputDto inputDto)
+        {
+            // The same implementation as before
+            if (inputDto == null)
+            {
+                return BadRequest(new ApiResponse { Success = false, Message = "Profile data is required" });
+            }
+
+            // Get the Auth0 user ID from the token
+            var auth0UserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(auth0UserId))
+            {
+                return Unauthorized(new ApiResponse { Success = false, Message = "User not authenticated" });
+            }
+
+            _logger.LogInformation($"Creating profile for Auth0 user: {auth0UserId}");
+
             // Check if profile already exists
-            var existingProfile = await _profileService.GetProfileByUserId(userId);
+            var existingProfile = await _profileService.GetByAuth0Id(auth0UserId);
             if (existingProfile != null)
             {
                 return BadRequest(new ApiResponse { Success = false, Message = "Profile already exists. Use PUT to update." });
             }
 
-            // Create user if not exists
-            var existingUser = await _userService.GetUserByAuth0Id(userId);
+            // Create or get the user first
+            var existingUser = await _userService.GetUserByAuth0Id(auth0UserId);
             if (existingUser == null)
             {
                 var userDto = new UserDto
                 {
-                    Auth0Id = userId,
-                    Email = profileDto.Email,
-                    FirstName = profileDto.FirstName,
-                    LastName = profileDto.LastName
+                    Auth0Id = auth0UserId,
+                    Email = inputDto.Email,
+                    FirstName = inputDto.FirstName,
+                    LastName = inputDto.LastName
                 };
 
-                await _userService.CreateUser(userDto);
+                existingUser = await _userService.CreateUser(userDto);
+                if (existingUser == null)
+                {
+                    return StatusCode(500, new ApiResponse { Success = false, Message = "Failed to create user record" });
+                }
             }
 
-            profileDto.UserId = userId;
-            var createdProfile = await _profileService.CreateProfile(profileDto);
-            return CreatedAtAction(nameof(GetProfile), new { id = createdProfile.ProfileId }, createdProfile);
-        }
-
-        /// <summary>
-        /// Update the user's profile
-        /// </summary>
-        [HttpPut]
-        public async Task<ActionResult<ProfileDto>> UpdateProfile([FromBody] ProfileDto profileDto)
-        {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            // Create a new ProfileDto from the input
+            var profileDto = new ProfileDto
             {
-                return Unauthorized(new ApiResponse { Success = false, Message = "User not authenticated" });
-            }
+                ProfileId = Guid.NewGuid(),
+                UserId = existingUser.UserId,
+                Auth0UserId = auth0UserId,
+                FirstName = inputDto.FirstName,
+                LastName = inputDto.LastName,
+                Email = inputDto.Email,
+                Bio = inputDto.Bio ?? string.Empty,
+                ProfilePictureUrl = inputDto.ProfilePictureUrl ?? string.Empty,
+                MaxTravelDistance = inputDto.MaxTravelDistance,
+                PreferredDays = inputDto.PreferredDays ?? new List<string>(),
+                PreferredTimes = inputDto.PreferredTimes ?? new List<string>(),
+                VerificationStatus = inputDto.VerificationStatus ?? "Unverified",
+                PublicProfile = inputDto.PublicProfile,
+                UpdatedAt = DateTime.UtcNow
+            };
 
-            // Check if profile exists
-            var existingProfile = await _profileService.GetProfileByUserId(userId);
-            if (existingProfile == null)
+            // Create the point from lat/long
+            try
             {
-                return NotFound(new ApiResponse { Success = false, Message = "Profile not found. Use POST to create." });
+                double latitude = inputDto.Latitude ?? 0;
+                double longitude = inputDto.Longitude ?? 0;
+
+                var geometryFactory = new GeometryFactory();
+                var point = geometryFactory.CreatePoint(new Coordinate(longitude, latitude));
+                point.SRID = 4326;
+                profileDto.PreferredLocation = point;
+
+                _logger.LogInformation($"Created point at ({longitude}, {latitude})");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create spatial point, using default");
+                var geometryFactory = new GeometryFactory();
+                profileDto.PreferredLocation = geometryFactory.CreatePoint(new Coordinate(0, 0));
+                profileDto.PreferredLocation.SRID = 4326;
             }
 
-            profileDto.UserId = userId;
-            profileDto.ProfileId = existingProfile.ProfileId; // Ensure we're updating the right profile
-            var updatedProfile = await _profileService.UpdateProfile(profileDto);
-            return Ok(updatedProfile);
+            try
+            {
+                var createdProfile = await _profileService.CreateProfile(profileDto);
+                return CreatedAtAction(nameof(GetProfile), new { id = createdProfile.ProfileId }, createdProfile);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create profile");
+                return StatusCode(500, new ApiResponse
+                {
+                    Success = false,
+                    Message = $"Failed to create profile: {ex.Message}"
+                });
+            }
         }
 
         /// <summary>

@@ -13,14 +13,14 @@ namespace BuddyUp.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class SportController : ControllerBase
+    public class SportsController : ControllerBase
     {
         private readonly IAdminService _adminService;
-        private readonly ILogger<SportController> _logger;
+        private readonly ILogger<SportsController> _logger;
 
-        public SportController(
+        public SportsController(
             IAdminService adminService,
-            ILogger<SportController> logger)
+            ILogger<SportsController> logger)
         {
             _adminService = adminService ?? throw new ArgumentNullException(nameof(adminService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using Newtonsoft.Json;
 
 namespace BuddyUp.API.Models.DTOs
 {
@@ -8,7 +9,9 @@ namespace BuddyUp.API.Models.DTOs
     {
         public Guid ProfileId { get; set; }
         
-        public string UserId { get; set; }
+        public Guid UserId { get; set; }
+
+        public string Auth0UserId { get; set; }
         
         public string FirstName { get; set; }
         
@@ -19,6 +22,9 @@ namespace BuddyUp.API.Models.DTOs
         public string Bio { get; set; }
         
         public string ProfilePictureUrl { get; set; }
+
+        [JsonIgnore]
+       public NetTopologySuite.Geometries.Point PreferredLocation { get; set; }
         
         public double? Latitude { get; set; }
         

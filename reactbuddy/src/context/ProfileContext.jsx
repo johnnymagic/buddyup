@@ -27,10 +27,10 @@ export const ProfileProvider = ({ children }) => {
         // Fetch detailed profile data
         const profile = await api.get('/api/profile');
         setProfileData(profile);
-        
+        console.log('Profile fetched:', profile);
         // Fetch user sports
-        const sports = await api.get('/api/profile/sports');
-        setUserSports(sports);
+        //const sports = await api.get('/api/profile/sports');
+        // setUserSports(sports);
         
         // Fetch verification status
         const verification = await api.get('/api/profile/verification');

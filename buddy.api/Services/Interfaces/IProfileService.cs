@@ -7,9 +7,14 @@ namespace BuddyUp.API.Services.Interfaces
     public interface IProfileService
     {
         /// <summary>
-        /// Get a user profile by Auth0 user ID
+        /// Get a user profile by db user ID
         /// </summary>
-        Task<ProfileDto> GetProfileByUserId(string userId);
+        Task<ProfileDto> GetProfileByUserId(Guid userId);
+
+ /// <summary>
+        /// Get a user profile by auth0 user ID
+        /// </summary>
+        Task<ProfileDto> GetByAuth0Id(string auth0UserId);
         
         /// <summary>
         /// Create a new user profile

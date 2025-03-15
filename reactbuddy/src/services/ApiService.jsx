@@ -3,12 +3,17 @@
  */
 class ApiService {
   constructor() {
-    this.baseUrl = import.meta.env.REACT_APP_API_URL || 'https://api.buddyup.com';
+    this.baseUrl = import.meta.env.VITE_API_URL;
     this.headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     };
-    this.token = null;
+    
+    // Load token from localStorage on initialization
+    this.token = localStorage.getItem('auth_token');
+    if (this.token) {
+      this.headers['Authorization'] = `Bearer ${this.token}`;
+    }
   }
 
   /**
@@ -19,9 +24,14 @@ class ApiService {
     this.token = token;
     
     if (token) {
+      // Store in localStorage for persistence
+      localStorage.setItem('auth_token', token);
       this.headers['Authorization'] = `Bearer ${token}`;
+
     } else {
+      localStorage.removeItem('auth_token');
       delete this.headers['Authorization'];
+
     }
   }
 
@@ -30,7 +40,9 @@ class ApiService {
    */
   clearAuthToken() {
     this.token = null;
+    localStorage.removeItem('auth_token');
     delete this.headers['Authorization'];
+
   }
 
   /**
@@ -50,9 +62,11 @@ class ApiService {
     });
     
     try {
+      
       const response = await fetch(url.toString(), {
         method: 'GET',
-        headers: this.headers
+        headers: this.headers,
+        credentials: 'include' // For CORS with credentials
       });
       
       return this._handleResponse(response);
@@ -69,10 +83,13 @@ class ApiService {
    */
   async post(endpoint, data = {}) {
     try {
+
+      
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'POST',
         headers: this.headers,
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
+        credentials: 'include' // For CORS with credentials
       });
       
       return this._handleResponse(response);
@@ -89,14 +106,23 @@ class ApiService {
    */
   async put(endpoint, data = {}) {
     try {
+
+      // Refresh token from localStorage in case it was updated elsewhere
+      const storedToken = localStorage.getItem('auth_token');
+      if (storedToken && storedToken !== this.token) {
+        this.setAuthToken(storedToken);
+      }
+      
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'PUT',
         headers: this.headers,
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
+        credentials: 'include' // For CORS with credentials
       });
       
       return this._handleResponse(response);
     } catch (error) {
+      console.log('Error in ApiService.put:', error);
       return this._handleError(error);
     }
   }
@@ -108,9 +134,12 @@ class ApiService {
    */
   async delete(endpoint) {
     try {
+     
+      
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'DELETE',
-        headers: this.headers
+        headers: this.headers,
+        credentials: 'include' // For CORS with credentials
       });
       
       return this._handleResponse(response);
@@ -126,9 +155,34 @@ class ApiService {
    * @returns {Promise<any>} Parsed response data
    */
   async _handleResponse(response) {
+
+    
+    // Log all headers for debugging
+    const headers = {};
+    response.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+
+    
     const contentType = response.headers.get('content-type');
     const isJson = contentType && contentType.includes('application/json');
-    const data = isJson ? await response.json() : await response.text();
+    
+    // Handle 401 Unauthorized specifically
+    if (response.status === 401) {
+      console.error('401 Unauthorized - Token may be invalid or expired');
+      // Consider clearing the token or redirecting to login
+      // this.clearAuthToken();
+      // window.location.href = '/login';
+    }
+    
+    let data;
+    try {
+      data = isJson ? await response.json() : await response.text();
+
+    } catch (err) {
+      console.error('Error parsing response:', err);
+      data = { error: 'Failed to parse response' };
+    }
     
     if (!response.ok) {
       // If the server returned an error with additional info

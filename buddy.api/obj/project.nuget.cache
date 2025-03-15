@@ -1,12 +1,13 @@
 {
   "version": 2,
-  "dgSpecHash": "X9sTppvd8MI=",
+  "dgSpecHash": "jXZFu+SlBDg=",
   "success": true,
   "projectFilePath": "/Users/johnmorris/Documents/src/prototypes/BuddyUp/buddy.api/buddy.api.csproj",
   "expectedPackageFiles": [
     "/Users/johnmorris/.nuget/packages/automapper/14.0.0/automapper.14.0.0.nupkg.sha512",
     "/Users/johnmorris/.nuget/packages/azure.core/1.38.0/azure.core.1.38.0.nupkg.sha512",
     "/Users/johnmorris/.nuget/packages/azure.identity/1.11.4/azure.identity.1.11.4.nupkg.sha512",
+    "/Users/johnmorris/.nuget/packages/efcore.namingconventions/9.0.0/efcore.namingconventions.9.0.0.nupkg.sha512",
     "/Users/johnmorris/.nuget/packages/humanizer/2.14.1/humanizer.2.14.1.nupkg.sha512",
     "/Users/johnmorris/.nuget/packages/humanizer.core/2.14.1/humanizer.core.2.14.1.nupkg.sha512",
     "/Users/johnmorris/.nuget/packages/humanizer.core.af/2.14.1/humanizer.core.af.2.14.1.nupkg.sha512",

@@ -14,6 +14,8 @@ namespace BuddyUp.API
             var builder = WebApplication.CreateBuilder(args);
 
             
+builder.Logging.AddConsole();
+builder.Logging.SetMinimumLevel(LogLevel.Debug);
 
             // Add services to the container
             var startup = new Startup(builder.Configuration);
