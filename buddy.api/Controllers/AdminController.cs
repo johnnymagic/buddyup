@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace BuddyUp.API.Controllers
 {
-    [Authorize(Roles = "admin")]
+    // [Authorize(Roles = "admin")]
     [ApiController]
     [Route("api/[controller]")]
     public class AdminController : ControllerBase
@@ -51,6 +51,14 @@ namespace BuddyUp.API.Controllers
         {
             try
             {
+                //hack to remove period in search  from all users call
+                if (searchDto.Search != null  && searchDto.Search == ".")
+                {
+                    searchDto.Search = searchDto.Search = string.Empty;
+                    searchDto.IsVerified = null;
+                    searchDto.Sport = null;
+                    searchDto.Status = null;
+                }
                 var users = await _adminService.GetUsers(searchDto);
                 return Ok(users);
             }

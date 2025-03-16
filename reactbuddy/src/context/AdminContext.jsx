@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api } from '../services/ApiService';
 import { useAuth } from './AuthContext';
 
@@ -6,83 +6,139 @@ import { useAuth } from './AuthContext';
 const AdminContext = createContext();
 
 export const AdminProvider = ({ children }) => {
-  const { isAuthenticated, isAdmin } = useAuth();
+  const { isAuthenticated, token, isAdmin } = useAuth();
   
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState({ items: [], totalItems: 0, totalPages: 0 });
   const [sports, setSports] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [userReports, setUserReports] = useState([]);
-  const [verifications, setVerifications] = useState([]);
-  const [dashboardStats, setDashboardStats] = useState(null);
+  const [dashboardStats, setDashboardStats] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Load admin data when authenticated and has admin role
+  // Use ref to prevent duplicate API calls
+  const pendingRequests = useRef({});
+  
+  // Skip duplicate state updates when the data hasn't changed
+  const prevUsersRef = useRef(null);
+
+  // Fetch dashboard stats on initial load
   useEffect(() => {
-    const fetchAdminData = async () => {
-      if (!isAuthenticated || !isAdmin) return;
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const stats = await api.get('/api/admin/stats');
-        setDashboardStats(stats);
-      } catch (err) {
-        console.error('Error fetching admin dashboard stats', err);
-        setError('Failed to load admin dashboard stats');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchAdminData();
+    if (isAuthenticated && isAdmin) {
+      fetchDashboardStats();
+    }
   }, [isAuthenticated, isAdmin]);
 
-  // User management functions
-  const fetchUsers = async (page = 1, pageSize = 10, filters = {}) => {
-    if (!isAdmin) return;
+  // Fetch dashboard statistics
+  const fetchDashboardStats = useCallback(async () => {
+    if (!isAuthenticated || !isAdmin) return;
     
+    const requestId = 'dashboard';
+    if (pendingRequests.current[requestId]) return;
+    
+    pendingRequests.current[requestId] = true;
     setLoading(true);
     setError(null);
     
     try {
-      const queryParams = new URLSearchParams();
-      queryParams.append('page', page);
-      queryParams.append('pageSize', pageSize);
+      const response = await api.get('/api/admin/dashboard');
       
-      // Add filters to query
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) queryParams.append(key, value);
-      });
-      
-      const response = await api.get(`/api/admin/users?${queryParams.toString()}`);
-      setUsers(response);
-      return response;
+      if (response) {
+        setDashboardStats(prev => ({...response}));
+      }
     } catch (err) {
-      console.error('Error fetching users', err);
-      setError('Failed to load users');
-      throw err;
+      console.error('Error fetching dashboard stats', err);
+      setError('Failed to load dashboard statistics');
     } finally {
       setLoading(false);
+      pendingRequests.current[requestId] = false;
     }
-  };
+  }, [isAuthenticated, isAdmin]);
 
-  const updateUserStatus = async (userId, active) => {
+  // Fetch users with pagination and filters
+  const fetchUsers = useCallback(async (page = 1, pageSize = 10, filters = {}) => {
     if (!isAdmin) return;
+    
+    // Create a unique request ID based on parameters
+    const requestId = `users-${page}-${pageSize}-${JSON.stringify(filters)}`;
+    
+    // Prevent duplicate requests with same parameters
+    if (pendingRequests.current[requestId]) {
+      console.log('Skipping duplicate request:', requestId);
+      return;
+    }
+    
+    pendingRequests.current[requestId] = true;
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Build URL with all required fields
+      let baseUrl = `/api/admin/users?Page=${page}&PageSize=${pageSize}`;
+      
+      // IMPORTANT: Always include Search parameter (required by API validation)
+      baseUrl += `&Search=${filters.search || '.'}`;
+      
+      // Add other filter parameters
+      baseUrl += `&Sport=${filters.sport || 'all'}`;
+      baseUrl += `&Status=${filters.status || ''}`;
+      baseUrl += `&IsVerified=${filters.isVerified || ''}`;
+      
+      const response = await api.get(baseUrl);
+      
+      // Compare with previous state and only update if different
+      if (!prevUsersRef.current || 
+          JSON.stringify(prevUsersRef.current) !== JSON.stringify(response)) {
+        
+        // Create a completely new object to ensure React detects the change
+        const newUsersState = response ? 
+          {...response} : 
+          { items: [], totalItems: 0, totalPages: 0 };
+        
+        prevUsersRef.current = newUsersState;
+        setUsers(newUsersState);
+      }
+      return response;
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError('Failed to load users');
+      
+      // Initialize with empty dataset to avoid further errors
+      setUsers({ items: [], totalItems: 0, totalPages: 0 });
+      return { items: [], totalItems: 0, totalPages: 0 };
+    } finally {
+      setLoading(false);
+      pendingRequests.current[requestId] = false;
+    }
+  }, [isAdmin]);
+
+  // Update user active status
+  const updateUserStatus = useCallback(async (userId, isActive) => {
+    if (!isAuthenticated || !isAdmin) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      const response = await api.put(`/api/admin/users/${userId}/status`, { active });
+      const response = await api.put(`/api/admin/users/${userId}/status`, {
+        IsActive: isActive
+      });
       
-      // Update user in list
-      setUsers(prev => 
-        prev.map(user => 
-          user.userId === userId ? { ...user, active } : user
-        )
-      );
+      if (response) {
+        // Create a completely new object and array to ensure React detects the change
+        setUsers(prev => {
+          const newUsers = {
+            ...prev,
+            items: prev.items.map(user => 
+              user.userId === userId 
+                ? { ...user, active: isActive } 
+                : {...user}
+            )
+          };
+          
+          prevUsersRef.current = newUsers;
+          return newUsers;
+        });
+      }
       
       return response;
     } catch (err) {
@@ -92,62 +148,93 @@ export const AdminProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated, isAdmin]);
 
-  // Sport management functions
-  const fetchSports = async () => {
-    if (!isAdmin) return;
+  // Fetch sports
+  const fetchSports = useCallback(async () => {
+    if (!isAuthenticated || !isAdmin) return;
     
+    const requestId = 'sports';
+    if (pendingRequests.current[requestId]) return;
+    
+    pendingRequests.current[requestId] = true;
     setLoading(true);
     setError(null);
     
     try {
       const response = await api.get('/api/admin/sports');
-      setSports(response);
-      return response;
+      
+      if (response) {
+        setSports([...response]);
+      }
     } catch (err) {
       console.error('Error fetching sports', err);
       setError('Failed to load sports');
-      throw err;
     } finally {
       setLoading(false);
+      pendingRequests.current[requestId] = false;
     }
-  };
+  }, [isAuthenticated, isAdmin]);
 
-  const addSport = async (sportData) => {
-    if (!isAdmin) return;
+  // Create a new sport
+  const createSport = useCallback(async (sportData) => {
+    if (!isAuthenticated || !isAdmin) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      const response = await api.post('/api/admin/sports', sportData);
-      setSports(prev => [...prev, response]);
+      // Convert to pascal case for API
+      const apiData = {
+        Name: sportData.name,
+        Description: sportData.description,
+        IconUrl: sportData.iconUrl,
+        Category: sportData.category,
+        IsActive: sportData.isActive
+      };
+      
+      const response = await api.post('/api/admin/sports', apiData);
+      
+      if (response) {
+        setSports(prev => [...prev, response]);
+      }
+      
       return response;
     } catch (err) {
-      console.error('Error adding sport', err);
-      setError('Failed to add sport');
+      console.error('Error creating sport', err);
+      setError('Failed to create sport');
       throw err;
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated, isAdmin]);
 
-  const updateSport = async (sportId, sportData) => {
-    if (!isAdmin) return;
+  // Update an existing sport
+  const updateSport = useCallback(async (sportId, sportData) => {
+    if (!isAuthenticated || !isAdmin) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      const response = await api.put(`/api/admin/sports/${sportId}`, sportData);
+      // Convert to pascal case for API
+      const apiData = {
+        Name: sportData.name,
+        Description: sportData.description,
+        IconUrl: sportData.iconUrl,
+        Category: sportData.category,
+        IsActive: sportData.isActive
+      };
       
-      // Update sport in list
-      setSports(prev => 
-        prev.map(sport => 
-          sport.sportId === sportId ? response : sport
-        )
-      );
+      const response = await api.put(`/api/admin/sports/${sportId}`, apiData);
+      
+      if (response) {
+        setSports(prev => 
+          prev.map(sport => 
+            sport.sportId === sportId ? {...response} : {...sport}
+          )
+        );
+      }
       
       return response;
     } catch (err) {
@@ -157,167 +244,146 @@ export const AdminProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated, isAdmin]);
 
-  // Location management functions
-  const fetchLocations = async (page = 1, pageSize = 10) => {
-    if (!isAdmin) return;
+  // Fetch locations
+  const fetchLocations = useCallback(async () => {
+    if (!isAuthenticated || !isAdmin) return;
     
+    const requestId = 'locations';
+    if (pendingRequests.current[requestId]) return;
+    
+    pendingRequests.current[requestId] = true;
     setLoading(true);
     setError(null);
     
     try {
-      const response = await api.get(`/api/admin/locations?page=${page}&pageSize=${pageSize}`);
-      setLocations(response);
-      return response;
+      const response = await api.get('/api/location');
+      
+      if (response) {
+        setLocations([...response]);
+      }
     } catch (err) {
       console.error('Error fetching locations', err);
       setError('Failed to load locations');
-      throw err;
     } finally {
       setLoading(false);
+      pendingRequests.current[requestId] = false;
     }
-  };
+  }, [isAuthenticated, isAdmin]);
 
-  const addLocation = async (locationData) => {
-    if (!isAdmin) return;
+  // Create a new location
+  const createLocation = useCallback(async (locationData) => {
+    if (!isAuthenticated || !isAdmin) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      const response = await api.post('/api/admin/locations', locationData);
-      setLocations(prev => [...prev, response]);
-      return response;
-    } catch (err) {
-      console.error('Error adding location', err);
-      setError('Failed to add location');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // User reports management
-  const fetchUserReports = async (status = 'Pending') => {
-    if (!isAdmin) return;
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await api.get(`/api/admin/reports?status=${status}`);
-      setUserReports(response);
-      return response;
-    } catch (err) {
-      console.error('Error fetching user reports', err);
-      setError('Failed to load user reports');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUserReport = async (reportId, action, notes) => {
-    if (!isAdmin) return;
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await api.put(`/api/admin/reports/${reportId}`, {
-        action,
-        notes
-      });
+      // Convert to pascal case for API
+      const apiData = {
+        Name: locationData.name,
+        Address: locationData.address,
+        City: locationData.city,
+        State: locationData.state,
+        ZipCode: locationData.zipCode,
+        Country: locationData.country,
+        Latitude: locationData.latitude,
+        Longitude: locationData.longitude,
+        IsActive: locationData.isActive
+      };
       
-      // Update report in list
-      setUserReports(prev => 
-        prev.map(report => 
-          report.reportId === reportId ? response : report
-        )
-      );
+      const response = await api.post('/api/admin/locations', apiData);
+      
+      if (response) {
+        setLocations(prev => [...prev, response]);
+      }
       
       return response;
     } catch (err) {
-      console.error('Error handling user report', err);
-      setError('Failed to handle user report');
+      console.error('Error creating location', err);
+      setError('Failed to create location');
       throw err;
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated, isAdmin]);
 
-  // Verification management
-  const fetchVerifications = async (status = 'Pending') => {
-    if (!isAdmin) return;
+  // Update an existing location
+  const updateLocation = useCallback(async (locationId, locationData) => {
+    if (!isAuthenticated || !isAdmin) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      const response = await api.get(`/api/admin/verifications?status=${status}`);
-      setVerifications(response);
+      // Convert to pascal case for API
+      const apiData = {
+        Name: locationData.name,
+        Address: locationData.address,
+        City: locationData.city,
+        State: locationData.state,
+        ZipCode: locationData.zipCode,
+        Country: locationData.country,
+        Latitude: locationData.latitude,
+        Longitude: locationData.longitude,
+        IsActive: locationData.isActive
+      };
+      
+      const response = await api.put(`/api/admin/locations/${locationId}`, apiData);
+      
+      if (response) {
+        setLocations(prev => 
+          prev.map(location => 
+            location.locationId === locationId ? {...response} : {...location}
+          )
+        );
+      }
+      
       return response;
     } catch (err) {
-      console.error('Error fetching verifications', err);
-      setError('Failed to load verifications');
+      console.error('Error updating location', err);
+      setError('Failed to update location');
       throw err;
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated, isAdmin]);
 
-  const handleVerification = async (verificationId, approved, notes) => {
-    if (!isAdmin) return;
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await api.put(`/api/admin/verifications/${verificationId}`, {
-        approved,
-        notes
-      });
-      
-      // Update verification in list
-      setVerifications(prev => 
-        prev.map(verification => 
-          verification.verificationId === verificationId ? response : verification
-        )
-      );
-      
-      return response;
-    } catch (err) {
-      console.error('Error handling verification', err);
-      setError('Failed to handle verification');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Value object to be provided to consumers
-  const adminValue = {
+  // Use useMemo to prevent unnecessary re-renders of consumers
+  const adminValue = useMemo(() => ({
     users,
     sports,
     locations,
-    userReports,
-    verifications,
     dashboardStats,
     loading,
     error,
     fetchUsers,
     updateUserStatus,
     fetchSports,
-    addSport,
+    createSport,
     updateSport,
     fetchLocations,
-    addLocation,
-    fetchUserReports,
-    handleUserReport,
-    fetchVerifications,
-    handleVerification
-  };
+    createLocation,
+    updateLocation,
+    fetchDashboardStats
+  }), [
+    users, 
+    sports, 
+    locations, 
+    dashboardStats, 
+    loading, 
+    error, 
+    fetchUsers,
+    updateUserStatus,
+    fetchSports,
+    createSport,
+    updateSport,
+    fetchLocations,
+    createLocation,
+    updateLocation,
+    fetchDashboardStats
+  ]);
 
   return (
     <AdminContext.Provider value={adminValue}>

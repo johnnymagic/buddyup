@@ -167,10 +167,12 @@ const ProfileForm = () => {
           skillLevel
         });
       } else {
+        console.log('user', user);
         // Add new user-sport
         await api.post('/api/profile/sports', {
           sportId,
-          skillLevel
+          skillLevel,
+          userId: user.sub,  
         });
       }
 

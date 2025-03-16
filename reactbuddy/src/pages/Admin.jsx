@@ -7,7 +7,7 @@ import SportManagement from '../components/admin/SportManagement';
 import LocationManagement from '../components/admin/LocationManagement';
 import UserManagement from '../components/admin/UserManagement';
 import DashboardStats from '../components/admin/DashboardStats';
-
+import MinimalUserDisplay from '../components/admin/MinimalUserDisplay';
 /**
  * Admin page component with sub-routes for different admin functions
  */
@@ -46,7 +46,7 @@ const Admin = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">Admin Panel</h1>
-      
+    
       {/* Admin Navigation */}
       <div className="bg-white shadow-md rounded-lg p-4 mb-8">
         <nav className="flex flex-wrap gap-2">

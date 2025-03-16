@@ -7,13 +7,15 @@ import { AuthProvider } from './context/AuthContext';
 import { ProfileProvider } from './context/ProfileContext';
 import { MatchingProvider } from './context/MatchingContext';
 import { MessagingProvider } from './context/MessagingContext';
-import { AdminProvider } from './context/AdminContext';
+import { AdminProvider } from './context/AdminContext'; // Make sure this import matches your file structure
+import { ActivityProvider } from './context/ActivityContext';
 
 // Components
 import Navbar from './components/common/Navbar';
 import Footer from './components/common/Footer';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import './index.css';
+
 // Pages
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -21,10 +23,10 @@ import Profile from './pages/Profile';
 import FindBuddies from './pages/FindBuddies';
 import Messages from './pages/Messages';
 import ActivitySuggestions from './pages/ActivitySuggestions';
+import ActivityDetail from './pages/ActivityDetail';
+import ActivityForm from './pages/ActivityForm';
 import Verification from './pages/Verification';
 import Admin from './pages/Admin';
-
-
 
 function App() {
   return (
@@ -36,80 +38,111 @@ function App() {
         audience: import.meta.env.VITE_AUTH0_AUDIENCE,  // "https://buddyup-api"
         scope: 'openid profile email'
       }}
+      useRefreshTokens={true}
+      cacheLocation="localstorage"
     >
       <AuthProvider>
         <ProfileProvider>
           <MatchingProvider>
             <MessagingProvider>
               <AdminProvider>
-                <Router>
-                  <div className="flex flex-col min-h-screen">
-                    <Navbar />
-                    <main className="flex-grow">
-                      <Routes>
-                        {/* Public routes */}
-                        <Route path="/" element={<Home />} />
-                        <Route path="/login" element={<Login />} />
+                <ActivityProvider>
+                  <Router>
+                    <div className="flex flex-col min-h-screen">
+                      <Navbar />
+                      <main className="flex-grow">
+                        <Routes>
+                          {/* Public routes */}
+                          <Route path="/" element={<Home />} />
+                          <Route path="/login" element={<Login />} />
 
-                        {/* Protected routes */}
-                        <Route
-                          path="/profile"
-                          element={
-                            <ProtectedRoute>
-                              <Profile />
-                            </ProtectedRoute>
-                          }
-                        />
-                        <Route
-                          path="/find-buddies"
-                          element={
-                            <ProtectedRoute>
-                              <FindBuddies />
-                            </ProtectedRoute>
-                          }
-                        />
-                        <Route
-                          path="/messages"
-                          element={
-                            <ProtectedRoute>
-                              <Messages />
-                            </ProtectedRoute>
-                          }
-                        />
-                        <Route
-                          path="/activities"
-                          element={
-                            <ProtectedRoute>
-                              <ActivitySuggestions />
-                            </ProtectedRoute>
-                          }
-                        />
-                        <Route
-                          path="/verification"
-                          element={
-                            <ProtectedRoute>
-                              <Verification />
-                            </ProtectedRoute>
-                          }
-                        />
+                          {/* Protected routes */}
+                          <Route
+                            path="/profile"
+                            element={
+                              <ProtectedRoute>
+                                <Profile />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/find-buddies"
+                            element={
+                              <ProtectedRoute>
+                                <FindBuddies />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/messages"
+                            element={
+                              <ProtectedRoute>
+                                <Messages />
+                              </ProtectedRoute>
+                            }
+                          />
 
-                        {/* Admin routes */}
-                        <Route
-                          path="/admin/*"
-                          element={
-                            <ProtectedRoute adminOnly>
-                              <Admin />
-                            </ProtectedRoute>
-                          }
-                        />
+                          {/* Activity routes */}
+                          <Route
+                            path="/activities"
+                            element={
+                              <ProtectedRoute>
+                                <ActivitySuggestions />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/activity/:activityId"
+                            element={
+                              <ProtectedRoute>
+                                <ActivityDetail />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/activities/create"
+                            element={
+                              <ProtectedRoute>
+                                <ActivityForm />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/activities/edit/:activityId"
+                            element={
+                              <ProtectedRoute>
+                                <ActivityForm />
+                              </ProtectedRoute>
+                            }
+                          />
 
-                        {/* Fallback route */}
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                      </Routes>
-                    </main>
-                    <Footer />
-                  </div>
-                </Router>
+                          <Route
+                            path="/verification"
+                            element={
+                              <ProtectedRoute>
+                                <Verification />
+                              </ProtectedRoute>
+                            }
+                          />
+
+                          {/* Admin routes */}
+                          <Route
+                            path="/admin/*"
+                            element={
+                              <ProtectedRoute adminOnly>
+                                <Admin />
+                              </ProtectedRoute>
+                            }
+                          />
+
+                          {/* Fallback route */}
+                          <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                      </main>
+                      <Footer />
+                    </div>
+                  </Router>
+                </ActivityProvider>
               </AdminProvider>
             </MessagingProvider>
           </MatchingProvider>

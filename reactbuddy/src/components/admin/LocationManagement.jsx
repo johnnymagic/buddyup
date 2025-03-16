@@ -1,16 +1,48 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAdmin } from '../../hooks/useAdmin';
 import Button from '../common/Button';
 import Spinner from '../common/Spinner';
+
+// Modal component using React Portal
+const Modal = ({ isOpen, onClose, title, children }) => {
+  // Don't render anything if the modal is not open
+  if (!isOpen) return null;
+
+  // Create a portal to render the modal outside the React tree
+  return createPortal(
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      style={{ backdropFilter: 'blur(2px)' }}
+    >
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-lg overflow-hidden">
+        <div className="p-4 border-b flex justify-between items-center">
+          <h3 className="text-lg font-medium">{title}</h3>
+          <button 
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            &times;
+          </button>
+        </div>
+        <div className="overflow-y-auto">
+          {children}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
 
 /**
  * Location Management component for admin dashboard
  */
 const LocationManagement = () => {
-  const { locations, fetchLocations, addLocation, loading, error } = useAdmin();
+  const { locations, fetchLocations, createLocation, loading, error } = useAdmin();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -22,12 +54,18 @@ const LocationManagement = () => {
     longitude: ''
   });
   
-  // Fetch locations when component mounts or page changes
-  useEffect(() => {
-    fetchLocations(currentPage);
-  }, [fetchLocations, currentPage]);
+  // Manual load function
+  const handleLoadData = async () => {
+    try {
+      await fetchLocations(currentPage);
+      setDataLoaded(true);
+    } catch (err) {
+      console.error('Error loading locations:', err);
+    }
+  };
   
   const openModal = () => {
+    console.log('Opening modal');
     setFormData({
       name: '',
       address: '',
@@ -42,6 +80,7 @@ const LocationManagement = () => {
   };
   
   const closeModal = () => {
+    console.log('Closing modal');
     setIsModalOpen(false);
   };
   
@@ -71,35 +110,242 @@ const LocationManagement = () => {
     }
     
     try {
-      await addLocation({
-        ...formData,
+      await createLocation({
+        name: formData.name,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zipCode: formData.postalCode,
+        country: formData.country,
         latitude: lat,
-        longitude: lng
+        longitude: lng,
+        isActive: true
       });
       
       closeModal();
-      await fetchLocations(currentPage); // Refresh the list
+      // Manually refresh the list after adding
+      fetchLocations(currentPage);
     } catch (err) {
       console.error('Error saving location:', err);
     }
   };
   
-  const handlePageChange = (newPage) => {
-    if (newPage > 0) {
+  const handlePageChange = async (newPage) => {
+    if (newPage > 0 && (!locations.totalPages || newPage <= locations.totalPages)) {
       setCurrentPage(newPage);
+      
+      try {
+        await fetchLocations(newPage);
+      } catch (err) {
+        console.error('Page change failed:', err);
+      }
     }
   };
   
+  // If data hasn't been loaded yet, show the load button
+  if (!dataLoaded) {
+    return (
+      <div className="bg-white shadow-md rounded-lg p-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold">Location Management</h2>
+          <p className="text-gray-600">Click the button below to load location data.</p>
+        </div>
+        
+        <div className="flex space-x-3">
+          <Button
+            onClick={handleLoadData}
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {loading ? 'Loading...' : 'Load Locations'}
+          </Button>
+          
+          <Button
+            onClick={openModal}
+            disabled={loading}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            Add New Location
+          </Button>
+        </div>
+        
+        {error && (
+          <div className="mt-4 bg-red-50 border-l-4 border-red-400 p-4">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+        
+        {/* Modal for adding locations */}
+        <Modal isOpen={isModalOpen} onClose={closeModal} title="Add New Location">
+          <form onSubmit={handleSubmit}>
+            <div className="p-4">
+              <div className="mb-4">
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                  Location Name *
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  id="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                  Address
+                </label>
+                <textarea
+                  name="address"
+                  id="address"
+                  rows="2"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                ></textarea>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+                    City *
+                  </label>
+                  <input
+                    type="text"
+                    name="city"
+                    id="city"
+                    value={formData.city}
+                    onChange={handleInputChange}
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="state" className="block text-sm font-medium text-gray-700">
+                    State/Province *
+                  </label>
+                  <input
+                    type="text"
+                    name="state"
+                    id="state"
+                    value={formData.state}
+                    onChange={handleInputChange}
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700">
+                    Postal Code
+                  </label>
+                  <input
+                    type="text"
+                    name="postalCode"
+                    id="postalCode"
+                    value={formData.postalCode}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                    Country *
+                  </label>
+                  <input
+                    type="text"
+                    name="country"
+                    id="country"
+                    value={formData.country}
+                    onChange={handleInputChange}
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label htmlFor="latitude" className="block text-sm font-medium text-gray-700">
+                    Latitude *
+                  </label>
+                  <input
+                    type="text"
+                    name="latitude"
+                    id="latitude"
+                    value={formData.latitude}
+                    onChange={handleInputChange}
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="longitude" className="block text-sm font-medium text-gray-700">
+                    Longitude *
+                  </label>
+                  <input
+                    type="text"
+                    name="longitude"
+                    id="longitude"
+                    value={formData.longitude}
+                    onChange={handleInputChange}
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                * Required fields. Latitude must be between -90 and 90, longitude must be between -180 and 180.
+              </p>
+            </div>
+            
+            <div className="bg-gray-50 px-4 py-3 flex justify-end space-x-3 border-t">
+              <button
+                type="button"
+                className="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                onClick={closeModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                disabled={loading}
+              >
+                {loading ? 'Saving...' : 'Add Location'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white shadow-md rounded-lg p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-semibold">Location Management</h2>
-        <Button
-          onClick={openModal}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          Add New Location
-        </Button>
+        <div className="flex space-x-2">
+          <Button
+            onClick={handleLoadData}
+            className="bg-gray-200 hover:bg-gray-300 text-gray-800"
+            disabled={loading}
+          >
+            {loading ? 'Refreshing...' : 'Refresh Data'}
+          </Button>
+          <Button
+            onClick={openModal}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            disabled={loading}
+          >
+            Add New Location
+          </Button>
+        </div>
       </div>
       
       {error && (
@@ -144,40 +390,40 @@ const LocationManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {locations.items?.map((location) => (
-                <tr key={location.locationId}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{location.name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-normal">
-                    <div className="text-sm text-gray-500 max-w-md">
-                      {location.address}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {location.city}, {location.state}
-                      {location.country && `, ${location.country}`}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {location.latitude?.toFixed(6)}, {location.longitude?.toFixed(6)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      location.isVerified
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {location.isVerified ? 'Verified' : 'Unverified'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              
-              {!locations.items || locations.items.length === 0 && (
+              {locations?.items?.length > 0 ? (
+                locations.items.map((location) => (
+                  <tr key={location.locationId}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{location.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-normal">
+                      <div className="text-sm text-gray-500 max-w-md">
+                        {location.address}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {location.city}, {location.state}
+                        {location.country && `, ${location.country}`}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {location.latitude?.toFixed(6)}, {location.longitude?.toFixed(6)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        location.isActive
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {location.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
                 <tr>
                   <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
                     No locations found. Click "Add New Location" to create one.
@@ -188,51 +434,25 @@ const LocationManagement = () => {
           </table>
           
           {/* Pagination */}
-          {locations.totalPages > 1 && (
+          {locations?.totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200 sm:px-6">
-              <div className="flex justify-between flex-1 sm:hidden">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
-                    currentPage === 1
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === locations.totalPages}
-                  className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
-                    currentPage === locations.totalPages
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  Next
-                </button>
-              </div>
               <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm text-gray-700">
-                    Showing <span className="font-medium">{((currentPage - 1) * 10) + 1}</span> to{' '}
+                    Showing <span className="font-medium">{locations.items.length > 0 ? ((currentPage - 1) * 10) + 1 : 0}</span> to{' '}
                     <span className="font-medium">
-                      {Math.min(currentPage * 10, locations.totalItems)}
+                      {Math.min(currentPage * 10, locations.totalItems || 0)}
                     </span>{' '}
-                    of <span className="font-medium">{locations.totalItems}</span> results
+                    of <span className="font-medium">{locations.totalItems || 0}</span> results
                   </p>
                 </div>
                 <div>
                   <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                     <button
                       onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
+                      disabled={currentPage === 1 || loading}
                       className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
-                        currentPage === 1
-                          ? 'text-gray-300 cursor-not-allowed'
-                          : 'text-gray-500 hover:bg-gray-50'
+                        currentPage === 1 || loading ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'
                       }`}
                     >
                       <span className="sr-only">Previous</span>
@@ -241,27 +461,30 @@ const LocationManagement = () => {
                       </svg>
                     </button>
                     
-                    {[...Array(locations.totalPages).keys()].map((page) => (
-                      <button
-                        key={page + 1}
-                        onClick={() => handlePageChange(page + 1)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          currentPage === page + 1
-                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                        }`}
-                      >
-                        {page + 1}
-                      </button>
-                    ))}
+                    {/* Show up to 5 page buttons */}
+                    {[...Array(Math.min(5, locations.totalPages || 1)).keys()].map((i) => {
+                      const page = i + Math.max(1, Math.min(currentPage - 2, (locations.totalPages || 1) - 4));
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => handlePageChange(page)}
+                          disabled={loading}
+                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                            currentPage === page
+                              ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                          } ${loading ? 'cursor-not-allowed' : ''}`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
                     
                     <button
                       onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === locations.totalPages}
+                      disabled={currentPage === locations.totalPages || loading}
                       className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
-                        currentPage === locations.totalPages
-                          ? 'text-gray-300 cursor-not-allowed'
-                          : 'text-gray-500 hover:bg-gray-50'
+                        currentPage === locations.totalPages || loading ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'
                       }`}
                     >
                       <span className="sr-only">Next</span>
@@ -278,169 +501,152 @@ const LocationManagement = () => {
       )}
       
       {/* Modal for adding locations */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-10 overflow-y-auto">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+      <Modal isOpen={isModalOpen} onClose={closeModal} title="Add New Location">
+        <form onSubmit={handleSubmit}>
+          <div className="p-4">
+            <div className="mb-4">
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                Location Name *
+              </label>
+              <input
+                type="text"
+                name="name"
+                id="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                required
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              />
             </div>
             
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <form onSubmit={handleSubmit}>
-                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <div className="mb-4">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">
-                      Add New Location
-                    </h3>
-                  </div>
-                  
-                  <div className="mb-4">
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                      Location Name *
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      id="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    />
-                  </div>
-                  
-                  <div className="mb-4">
-                    <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-                      Address
-                    </label>
-                    <textarea
-                      name="address"
-                      id="address"
-                      rows="2"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    ></textarea>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label htmlFor="city" className="block text-sm font-medium text-gray-700">
-                        City *
-                      </label>
-                      <input
-                        type="text"
-                        name="city"
-                        id="city"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                        required
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="state" className="block text-sm font-medium text-gray-700">
-                        State/Province *
-                      </label>
-                      <input
-                        type="text"
-                        name="state"
-                        id="state"
-                        value={formData.state}
-                        onChange={handleInputChange}
-                        required
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700">
-                        Postal Code
-                      </label>
-                      <input
-                        type="text"
-                        name="postalCode"
-                        id="postalCode"
-                        value={formData.postalCode}
-                        onChange={handleInputChange}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="country" className="block text-sm font-medium text-gray-700">
-                        Country *
-                      </label>
-                      <input
-                        type="text"
-                        name="country"
-                        id="country"
-                        value={formData.country}
-                        onChange={handleInputChange}
-                        required
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label htmlFor="latitude" className="block text-sm font-medium text-gray-700">
-                        Latitude *
-                      </label>
-                      <input
-                        type="text"
-                        name="latitude"
-                        id="latitude"
-                        value={formData.latitude}
-                        onChange={handleInputChange}
-                        required
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="longitude" className="block text-sm font-medium text-gray-700">
-                        Longitude *
-                      </label>
-                      <input
-                        type="text"
-                        name="longitude"
-                        id="longitude"
-                        value={formData.longitude}
-                        onChange={handleInputChange}
-                        required
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    * Required fields. Latitude must be between -90 and 90, longitude must be between -180 and 180.
-                  </p>
-                </div>
-                
-                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                  <button
-                    type="submit"
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
-                  >
-                    {loading ? 'Saving...' : 'Add Location'}
-                  </button>
-                  <button
-                    type="button"
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                    onClick={closeModal}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
+            <div className="mb-4">
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                Address
+              </label>
+              <textarea
+                name="address"
+                id="address"
+                rows="2"
+                value={formData.address}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              ></textarea>
             </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+                  City *
+                </label>
+                <input
+                  type="text"
+                  name="city"
+                  id="city"
+                  value={formData.city}
+                  onChange={handleInputChange}
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="state" className="block text-sm font-medium text-gray-700">
+                  State/Province *
+                </label>
+                <input
+                  type="text"
+                  name="state"
+                  id="state"
+                  value={formData.state}
+                  onChange={handleInputChange}
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700">
+                  Postal Code
+                </label>
+                <input
+                  type="text"
+                  name="postalCode"
+                  id="postalCode"
+                  value={formData.postalCode}
+                  onChange={handleInputChange}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                  Country *
+                </label>
+                <input
+                  type="text"
+                  name="country"
+                  id="country"
+                  value={formData.country}
+                  onChange={handleInputChange}
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label htmlFor="latitude" className="block text-sm font-medium text-gray-700">
+                  Latitude *
+                </label>
+                <input
+                  type="text"
+                  name="latitude"
+                  id="latitude"
+                  value={formData.latitude}
+                  onChange={handleInputChange}
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="longitude" className="block text-sm font-medium text-gray-700">
+                  Longitude *
+                </label>
+                <input
+                  type="text"
+                  name="longitude"
+                  id="longitude"
+                  value={formData.longitude}
+                  onChange={handleInputChange}
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              * Required fields. Latitude must be between -90 and 90, longitude must be between -180 and 180.
+            </p>
           </div>
-        </div>
-      )}
+          
+          <div className="bg-gray-50 px-4 py-3 flex justify-end space-x-3 border-t">
+            <button
+              type="button"
+              className="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              onClick={closeModal}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={loading}
+            >
+              {loading ? 'Saving...' : 'Add Location'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

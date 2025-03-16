@@ -16,10 +16,10 @@ export const MatchingProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     sport: '',
-    skillLevel: '',
+    skillLevel: 'Beginner', // Default value to meet required field
     distance: 50, // default to 50km
-    days: [],
-    times: []
+    days: ['Monday'], // Default value to meet required field
+    times: ['Morning'] // Default value to meet required field
   });
 
   // Fetch potential matches when user is authenticated and filters change
@@ -29,14 +29,27 @@ export const MatchingProvider = ({ children }) => {
       
       setLoading(true);
       setError(null);
-      
       try {
         const queryParams = new URLSearchParams();
-        if (filters.sport) queryParams.append('sportId', filters.sport);
-        if (filters.skillLevel) queryParams.append('skillLevel', filters.skillLevel);
-        if (filters.distance) queryParams.append('distance', filters.distance);
-        if (filters.days.length) queryParams.append('days', filters.days.join(','));
-        if (filters.times.length) queryParams.append('times', filters.times.join(','));
+        
+        // Handle SportId - only add if it exists
+        if (filters.sport) {
+          queryParams.append('SportId', filters.sport);
+        } else {
+          queryParams.append('SportId', '58468fa5-c588-43e1-a54d-587e0dddd813'); // Send null for optional parameter
+        }
+        
+        // Always include required fields with proper casing
+        queryParams.append('SkillLevel', filters.skillLevel || 'Beginner');
+        queryParams.append('Distance', filters.distance.toString());
+        
+        // Always include Days and Times (ensuring they're non-empty arrays)
+        const days = filters.days && filters.days.length ? filters.days : ['Monday'];
+        const times = filters.times && filters.times.length ? filters.times : ['Morning'];
+        
+        // Add each value individually using the proper field name
+        days.forEach(day => queryParams.append('Days', day));
+        times.forEach(time => queryParams.append('Times', time));
         
         const response = await api.get(`/api/matching/potential?${queryParams.toString()}`);
         setPotentialMatches(response);
@@ -154,11 +167,24 @@ export const MatchingProvider = ({ children }) => {
       // Get potential match details to add back to potentials
       const match = pendingRequests.find(r => r.matchId === matchId);
       if (match) {
-        // Refresh potential matches
+        // Refresh potential matches with properly formatted query params
         const queryParams = new URLSearchParams();
-        if (filters.sport) queryParams.append('sportId', filters.sport);
-        if (filters.skillLevel) queryParams.append('skillLevel', filters.skillLevel);
-        if (filters.distance) queryParams.append('distance', filters.distance);
+        
+        if (filters.sport) {
+          queryParams.append('SportId', filters.sport);
+        } else {
+          queryParams.append('SportId', '58468fa5-c588-43e1-a54d-587e0dddd813');
+        }
+        
+        queryParams.append('SkillLevel', filters.skillLevel || 'Beginner');
+        queryParams.append('Distance', filters.distance.toString());
+        
+        // Add days and times properly
+        const days = filters.days && filters.days.length ? filters.days : ['Monday'];
+        const times = filters.times && filters.times.length ? filters.times : ['Morning'];
+        
+        days.forEach(day => queryParams.append('Days', day));
+        times.forEach(time => queryParams.append('Times', time));
         
         const potentials = await api.get(`/api/matching/potential?${queryParams.toString()}`);
         setPotentialMatches(potentials);

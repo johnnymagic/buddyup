@@ -12,7 +12,8 @@ export const AuthProvider = ({ children }) => {
     user,
     getAccessTokenSilently,
     loginWithRedirect,
-    logout
+    logout,
+    getIdTokenClaims
   } = useAuth0();
 
   const [token, setToken] = useState(null);
@@ -23,6 +24,24 @@ export const AuthProvider = ({ children }) => {
   const [tokenError, setTokenError] = useState(null);
   const [isProfileLoaded, setIsProfileLoaded] = useState(false);
   const [profileError, setProfileError] = useState(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
+
+  // Check for existing session on initial load
+  useEffect(() => {
+    // This will force Auth0 to check for an existing session
+    // and automatically log the user in if it exists
+    const checkSession = async () => {
+      try {
+        await getIdTokenClaims();
+      } catch (error) {
+        console.log('No existing session found or error checking session');
+      } finally {
+        setSessionChecked(true);
+      }
+    };
+
+    checkSession();
+  }, [getIdTokenClaims]);
 
   // Get token when user authenticates
   useEffect(() => {
@@ -38,7 +57,8 @@ export const AuthProvider = ({ children }) => {
           authorizationParams: {
             audience: import.meta.env.VITE_AUTH0_AUDIENCE,
             scope: 'openid profile email'
-          }
+          },
+          cacheMode: 'cache-first', // Prioritize using cached token
         });
 
         setToken(accessToken);
@@ -76,8 +96,10 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    getToken();
-  }, [isAuthenticated, user, getAccessTokenSilently]);
+    if (sessionChecked) {
+      getToken();
+    }
+  }, [isAuthenticated, user, getAccessTokenSilently, sessionChecked]);
 
   // Clear state on logout
   const handleLogout = () => {
@@ -202,7 +224,7 @@ export const AuthProvider = ({ children }) => {
 
   // Value object to be provided to consumers
   const authValue = {
-    isLoading: auth0Loading || authLoading,
+    isLoading: auth0Loading || authLoading || !sessionChecked,
     isAuthenticated,
     user,
     token,

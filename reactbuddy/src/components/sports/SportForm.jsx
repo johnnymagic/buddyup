@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Button, Card, Alert } from 'react-bootstrap';
-import { useSports } from '../context/SportsContext';
+import { useSports } from '../../context/SportsContext';
 
 const SportForm = () => {
   const { selectedSport, addSport, updateSport, selectSport } = useSports();
@@ -129,111 +128,155 @@ const SportForm = () => {
   };
   
   return (
-    <Card className="mb-4">
-      <Card.Header as="h5">
-        {selectedSport ? `Edit Sport: ${selectedSport.name}` : 'Add New Sport'}
-      </Card.Header>
-      <Card.Body>
+    <div className="bg-white rounded-lg shadow-md mb-4 overflow-hidden">
+      <div className="bg-gray-100 px-4 py-3 border-b">
+        <h5 className="text-lg font-semibold">
+          {selectedSport ? `Edit Sport: ${selectedSport.name}` : 'Add New Sport'}
+        </h5>
+      </div>
+      <div className="p-4">
         {successMessage && (
-          <Alert variant="success" dismissible onClose={() => setSuccessMessage(null)}>
-            {successMessage}
-          </Alert>
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 relative" role="alert">
+            <span className="block sm:inline">{successMessage}</span>
+            <button
+              type="button"
+              className="absolute top-0 right-0 p-1.5 mt-0.5 mr-0.5 text-green-500 hover:text-green-800"
+              onClick={() => setSuccessMessage(null)}
+            >
+              <span className="sr-only">Close</span>
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          </div>
         )}
         
         {apiError && (
-          <Alert variant="danger" dismissible onClose={() => setApiError(null)}>
-            {apiError}
-          </Alert>
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 relative" role="alert">
+            <span className="block sm:inline">{apiError}</span>
+            <button
+              type="button"
+              className="absolute top-0 right-0 p-1.5 mt-0.5 mr-0.5 text-red-500 hover:text-red-800"
+              onClick={() => setApiError(null)}
+            >
+              <span className="sr-only">Close</span>
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          </div>
         )}
         
-        <Form onSubmit={handleSubmit}>
-          <Form.Group className="mb-3" controlId="sportName">
-            <Form.Label>Sport Name *</Form.Label>
-            <Form.Control
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label htmlFor="sportName" className="block text-gray-700 font-medium mb-1">
+              Sport Name *
+            </label>
+            <input
               type="text"
+              id="sportName"
               name="name"
               value={formData.name}
               onChange={handleChange}
-              isInvalid={!!errors.name}
+              className={`w-full px-3 py-2 border rounded-md ${errors.name ? 'border-red-500' : 'border-gray-300'}`}
               placeholder="Enter sport name"
               required
             />
-            <Form.Control.Feedback type="invalid">
-              {errors.name}
-            </Form.Control.Feedback>
-          </Form.Group>
+            {errors.name && (
+              <p className="text-red-500 text-sm mt-1">{errors.name}</p>
+            )}
+          </div>
           
-          <Form.Group className="mb-3" controlId="sportDescription">
-            <Form.Label>Description</Form.Label>
-            <Form.Control
-              as="textarea"
+          <div className="mb-4">
+            <label htmlFor="sportDescription" className="block text-gray-700 font-medium mb-1">
+              Description
+            </label>
+            <textarea
+              id="sportDescription"
               name="description"
               value={formData.description}
               onChange={handleChange}
-              isInvalid={!!errors.description}
+              className={`w-full px-3 py-2 border rounded-md ${errors.description ? 'border-red-500' : 'border-gray-300'}`}
               placeholder="Enter sport description"
               rows={3}
             />
-            <Form.Control.Feedback type="invalid">
-              {errors.description}
-            </Form.Control.Feedback>
-          </Form.Group>
+            {errors.description && (
+              <p className="text-red-500 text-sm mt-1">{errors.description}</p>
+            )}
+          </div>
           
-          <Form.Group className="mb-3" controlId="sportIconUrl">
-            <Form.Label>Icon URL</Form.Label>
-            <Form.Control
+          <div className="mb-4">
+            <label htmlFor="sportIconUrl" className="block text-gray-700 font-medium mb-1">
+              Icon URL
+            </label>
+            <input
               type="text"
+              id="sportIconUrl"
               name="iconUrl"
               value={formData.iconUrl}
               onChange={handleChange}
-              isInvalid={!!errors.iconUrl}
+              className={`w-full px-3 py-2 border rounded-md ${errors.iconUrl ? 'border-red-500' : 'border-gray-300'}`}
               placeholder="Enter icon URL"
             />
-            <Form.Control.Feedback type="invalid">
-              {errors.iconUrl}
-            </Form.Control.Feedback>
-            <Form.Text className="text-muted">
+            {errors.iconUrl && (
+              <p className="text-red-500 text-sm mt-1">{errors.iconUrl}</p>
+            )}
+            <p className="text-gray-500 text-sm mt-1">
               URL to an image that represents this sport
-            </Form.Text>
-          </Form.Group>
+            </p>
+          </div>
           
           {selectedSport && (
-            <Form.Group className="mb-3" controlId="sportIsActive">
-              <Form.Check
-                type="checkbox"
-                name="isActive"
-                label="Active"
-                checked={formData.isActive}
-                onChange={handleChange}
-              />
-              <Form.Text className="text-muted">
+            <div className="mb-4">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="sportIsActive"
+                  name="isActive"
+                  checked={formData.isActive}
+                  onChange={handleChange}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                />
+                <label htmlFor="sportIsActive" className="ml-2 block text-gray-700">
+                  Active
+                </label>
+              </div>
+              <p className="text-gray-500 text-sm mt-1">
                 Inactive sports won't be shown to users
-              </Form.Text>
-            </Form.Group>
+              </p>
+            </div>
           )}
           
-          <div className="d-flex justify-content-end">
+          <div className="flex justify-end">
             {selectedSport && (
-              <Button 
-                variant="outline-secondary" 
+              <button 
+                type="button"
                 onClick={handleCancel}
-                className="me-2"
+                className="mr-2 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 disabled={submitting}
               >
                 Cancel
-              </Button>
+              </button>
             )}
-            <Button 
-              variant="primary" 
+            <button 
               type="submit"
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               disabled={submitting}
             >
               {submitting ? 'Saving...' : (selectedSport ? 'Update Sport' : 'Add Sport')}
-            </Button>
+            </button>
           </div>
-        </Form>
-      </Card.Body>
-    </Card>
+        </form>
+      </div>
+    </div>
   );
 };
 

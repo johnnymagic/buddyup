@@ -9,6 +9,7 @@ using BuddyUp.API.Models.Domain;
 using BuddyUp.API.Models.DTOs;
 using BuddyUp.API.Models.Responses;
 using BuddyUp.API.Services.Interfaces;
+using BuddyUp.API.Services;
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
@@ -24,8 +25,11 @@ namespace BuddyUp.API.Controllers
         private readonly IProfileService _profileService;
         private readonly IUserService _userService;
         private readonly ILogger<ProfileController> _logger;
-        public ProfileController(IProfileService profileService, IUserService userService, ILogger<ProfileController> logger)
+        private readonly ISportService _sportService;
+        public ProfileController(IProfileService profileService, IUserService userService, ILogger<ProfileController> logger, ISportService sportService)
         {
+            _sportService = sportService ?? throw new ArgumentNullException(nameof(sportService));
+       
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _profileService = profileService ?? throw new ArgumentNullException(nameof(profileService));
@@ -58,7 +62,7 @@ namespace BuddyUp.API.Controllers
 
         // Fix for the ProfileController UpsertProfile method
 
-      
+
         [HttpPut]
         public async Task<ActionResult<ProfileDto>> UpsertProfile([FromBody] ProfileUpdateInputDto inputDto)
         {
@@ -150,7 +154,7 @@ namespace BuddyUp.API.Controllers
             }
         }
 
-       
+
 
         [HttpPost]
         public async Task<ActionResult<ProfileDto>> CreateProfile([FromBody] ProfileUpdateInputDto inputDto)
@@ -280,7 +284,35 @@ namespace BuddyUp.API.Controllers
                 return Unauthorized(new ApiResponse { Success = false, Message = "User not authenticated" });
             }
 
-            userSportDto.UserId = userId;
+            var user = await _userService.GetUserByAuth0Id(userId);
+
+            // Set the UserId from the token
+            userSportDto.UserId = user.UserId.ToString();
+
+            // Get the sport details if not provided
+            if (string.IsNullOrEmpty(userSportDto.SportName) || string.IsNullOrEmpty(userSportDto.IconUrl))
+            {
+                try
+                {
+                    // Assuming you have a sport service or repository
+                    var sport = await _sportService.GetSportById(userSportDto.SportId);
+                    if (sport != null)
+                    {
+                        userSportDto.SportName = sport.Name;
+                        userSportDto.IconUrl = sport.IconUrl;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not fetch sport details for SportId {SportId}", userSportDto.SportId);
+                }
+            }
+
+            // Set defaults for any missing fields
+            userSportDto.Notes ??= string.Empty;
+            userSportDto.IsPublic = true;
+            userSportDto.UpdatedAt = DateTime.UtcNow;
+
             var addedSport = await _profileService.AddUserSport(userSportDto);
             return CreatedAtAction(nameof(GetUserSports), null, addedSport);
         }

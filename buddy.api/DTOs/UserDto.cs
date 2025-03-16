@@ -73,13 +73,14 @@ namespace BuddyUp.API.Models.DTOs
     
     public class UserSearchDto
     {
-        public string Search { get; set; }
+        [Required(AllowEmptyStrings = true)]
+    public string? Search { get; set; } = string.Empty;
         
-        public string Status { get; set; } // active, inactive
+        public string? Status { get; set; } // active, inactive
         
-        public string IsVerified { get; set; } // true, false
+        public string? IsVerified { get; set; } // true, false
         
-        public string Sport { get; set; } // sport id or name
+        public string? Sport { get; set; } // sport id or name
         
         public int Page { get; set; } = 1;
         

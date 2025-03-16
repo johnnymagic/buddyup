@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("buddy.api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+49b485f5a04c45b2f324e29927f3f745deb5ec37")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+cfe7c76852eabe599a2bc5b9b7cbda89216034a6")]
 [assembly: System.Reflection.AssemblyProductAttribute("buddy.api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("buddy.api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

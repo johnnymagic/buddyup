@@ -111,7 +111,8 @@ namespace BuddyUp.API.Services.Implementations
                     Latitude = profile.PreferredLocation?.Y,
                     Longitude = profile.PreferredLocation?.X,
                     VerificationStatus = profile.VerificationStatus,
-                    PublicProfile = profile.PublicProfile
+                    PublicProfile = profile.PublicProfile,
+                    IsAdmin = user.IsAdmin
                 };
 
                 return profileDto;

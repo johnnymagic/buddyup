@@ -162,6 +162,8 @@ namespace BuddyUp.API
             services.AddScoped<IActivityService, ActivityService>();
             services.AddScoped<IVerificationService, VerificationService>();
             services.AddScoped<IAdminService, AdminService>();
+            // In ConfigureServices method of Startup.cs or Program.cs
+            services.AddScoped<ISportService, SportService>();
 
             // Add AutoMapper
             services.AddAutoMapper(typeof(MappingProfiles));
