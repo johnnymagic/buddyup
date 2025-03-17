@@ -6,7 +6,7 @@ using BuddyUp.API.Models.Domain;
 using BuddyUp.API.Models.DTOs;
 using NetTopologySuite.Geometries;
 
-namespace BuddyUp.API.Utils
+namespace BuddyUp.API.Utils 
 {
     /// <summary>
     /// AutoMapper profiles for mapping between domain entities and DTOs
@@ -20,7 +20,7 @@ namespace BuddyUp.API.Utils
                 .ForMember(dest => dest.ProfilePictureUrl, opt => opt.MapFrom(src => src.Profile != null ? src.Profile.ProfilePictureUrl : null))
                 .ForMember(dest => dest.Bio, opt => opt.MapFrom(src => src.Profile != null ? src.Profile.Bio : null))
                 .ForMember(dest => dest.Sports, opt => opt.MapFrom(src => src.Sports));
-
+            
             CreateMap<UserDto, User>()
                 .ForMember(dest => dest.Profile, opt => opt.Ignore())
                 .ForMember(dest => dest.Sports, opt => opt.Ignore())
@@ -29,7 +29,7 @@ namespace BuddyUp.API.Utils
                 .ForMember(dest => dest.SentMessages, opt => opt.Ignore())
                 .ForMember(dest => dest.ReportsSubmitted, opt => opt.Ignore())
                 .ForMember(dest => dest.ReportsReceived, opt => opt.Ignore());
-
+            
             // UserSport mappings - DTO to Domain
             CreateMap<UserSportDto, UserSport>()
                 .ForMember(dest => dest.User, opt => opt.Ignore())
@@ -43,24 +43,24 @@ namespace BuddyUp.API.Utils
                         dest.UserSportId = src.UserSportId != Guid.Empty ? src.UserSportId : Guid.NewGuid();
                     }
                 });
-
+            
             // UserSport mappings
             CreateMap<UserSport, UserSportDto>()
                 .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.User.Auth0Id))
                 .ForMember(dest => dest.SportName, opt => opt.MapFrom(src => src.Sport.Name))
                 .ForMember(dest => dest.IconUrl, opt => opt.MapFrom(src => src.Sport.IconUrl));
-
+            
             // Sport mappings
             CreateMap<Sport, SportDto>()
                 .ForMember(dest => dest.CreatedBy, opt => opt.MapFrom(src =>
                     src.CreatedBy != null ? $"{src.CreatedBy.FirstName} {src.CreatedBy.LastName}" : null));
-
+            
             // Sport Create DTO to Sport entity
             CreateMap<SportCreateDto, Sport>();
-
+            
             // Sport Update DTO to Sport entity
             CreateMap<SportUpdateDto, Sport>();
-
+            
             CreateMap<User, UserListItemDto>()
                 .ForMember(dest => dest.Sports, opt => opt.MapFrom(src => src.Sports.Select(s => new SportBriefDto
                 {
@@ -68,6 +68,10 @@ namespace BuddyUp.API.Utils
                     Name = s.Sport.Name,
                     SkillLevel = s.SkillLevel
                 })));
+
+            // Add Location mappings
+            CreateMap<Models.Domain.Location, LocationDto>();
+            CreateMap<LocationDto, Models.Domain.Location>();
         }
     }
 }

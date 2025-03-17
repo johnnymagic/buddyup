@@ -10,7 +10,7 @@ export const AdminProvider = ({ children }) => {
   
   const [users, setUsers] = useState({ items: [], totalItems: 0, totalPages: 0 });
   const [sports, setSports] = useState([]);
-  const [locations, setLocations] = useState([]);
+  const [locations, setLocations] = useState({ items: [], totalItems: 0, totalPages: 0 });
   const [dashboardStats, setDashboardStats] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -41,9 +41,9 @@ export const AdminProvider = ({ children }) => {
     
     try {
       const response = await api.get('/api/admin/dashboard');
-      
+      console.log('Dashboard stats:', response);
       if (response) {
-        setDashboardStats(prev => ({...response}));
+        setDashboardStats(prev => ({...response.data}));
       }
     } catch (err) {
       console.error('Error fetching dashboard stats', err);
@@ -246,29 +246,56 @@ export const AdminProvider = ({ children }) => {
     }
   }, [isAuthenticated, isAdmin]);
 
-  // Fetch locations
-  const fetchLocations = useCallback(async () => {
-    if (!isAuthenticated || !isAdmin) return;
+  // Fetch locations with pagination
+  const fetchLocations = useCallback(async (page = 1, pageSize = 10) => {
+    if (!isAuthenticated || !isAdmin) {
+      console.log('User not authenticated or not admin, skipping fetchLocations');
+      return;
+    }
     
-    const requestId = 'locations';
-    if (pendingRequests.current[requestId]) return;
+    const requestId = `locations-${page}-${pageSize}`;
+    if (pendingRequests.current[requestId]) {
+      console.log('Duplicate request in progress, skipping:', requestId);
+      return pendingRequests.current[requestId];
+    }
     
-    pendingRequests.current[requestId] = true;
+    console.log(`Fetching locations - page: ${page}, pageSize: ${pageSize}`);
+    
+    // Create a promise to track this request
+    let promiseResolve, promiseReject;
+    pendingRequests.current[requestId] = new Promise((resolve, reject) => {
+      promiseResolve = resolve;
+      promiseReject = reject;
+    });
+    
     setLoading(true);
     setError(null);
     
     try {
-      const response = await api.get('/api/location');
+      const response = await api.get(`/api/location?Page=${page}&PageSize=${pageSize}`);
+      console.log('Locations API response:', response);
       
       if (response) {
-        setLocations([...response]);
+        console.log('Setting locations state with:', response);
+        // Store the complete response object with pagination metadata
+        setLocations(response);
+        promiseResolve(response);
       }
+      return response;
     } catch (err) {
       console.error('Error fetching locations', err);
       setError('Failed to load locations');
+      // Initialize with empty dataset on error
+      setLocations({ items: [], totalItems: 0, totalPages: 0 });
+      promiseReject(err);
+      throw err;
     } finally {
       setLoading(false);
-      pendingRequests.current[requestId] = false;
+      
+      // Only remove from pending after a delay to prevent immediate duplicate calls
+      setTimeout(() => {
+        delete pendingRequests.current[requestId];
+      }, 100);
     }
   }, [isAuthenticated, isAdmin]);
 
@@ -296,7 +323,12 @@ export const AdminProvider = ({ children }) => {
       const response = await api.post('/api/admin/locations', apiData);
       
       if (response) {
-        setLocations(prev => [...prev, response]);
+        // Update the locations state properly by adding to items array
+        setLocations(prev => ({
+          ...prev,
+          items: [...prev.items, response],
+          totalItems: prev.totalItems + 1
+        }));
       }
       
       return response;
@@ -333,11 +365,12 @@ export const AdminProvider = ({ children }) => {
       const response = await api.put(`/api/admin/locations/${locationId}`, apiData);
       
       if (response) {
-        setLocations(prev => 
-          prev.map(location => 
+        setLocations(prev => ({
+          ...prev,
+          items: prev.items.map(location => 
             location.locationId === locationId ? {...response} : {...location}
           )
-        );
+        }));
       }
       
       return response;

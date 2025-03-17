@@ -42,7 +42,6 @@ const LocationManagement = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [dataLoaded, setDataLoaded] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -54,15 +53,21 @@ const LocationManagement = () => {
     longitude: ''
   });
   
+  // Debug log for locations data
+  console.log('LocationManagement - locations data:', locations);
+  
   // Manual load function
   const handleLoadData = async () => {
+    console.log('Attempting to load locations data...');
     try {
-      await fetchLocations(currentPage);
-      setDataLoaded(true);
+      const response = await fetchLocations(currentPage, 10);
+      console.log('Location data fetched:', response);
     } catch (err) {
       console.error('Error loading locations:', err);
     }
   };
+  
+  console.log('Render state - loading:', loading, 'locations items length:', locations?.items?.length);
   
   const openModal = () => {
     console.log('Opening modal');
@@ -124,7 +129,7 @@ const LocationManagement = () => {
       
       closeModal();
       // Manually refresh the list after adding
-      fetchLocations(currentPage);
+      fetchLocations(currentPage, 10);
     } catch (err) {
       console.error('Error saving location:', err);
     }
@@ -135,7 +140,7 @@ const LocationManagement = () => {
       setCurrentPage(newPage);
       
       try {
-        await fetchLocations(newPage);
+        await fetchLocations(newPage, 10);
       } catch (err) {
         console.error('Page change failed:', err);
       }
@@ -143,12 +148,19 @@ const LocationManagement = () => {
   };
   
   // If data hasn't been loaded yet, show the load button
-  if (!dataLoaded) {
+  if (!locations?.items?.length) {
     return (
       <div className="bg-white shadow-md rounded-lg p-6">
         <div className="mb-6">
           <h2 className="text-2xl font-semibold">Location Management</h2>
           <p className="text-gray-600">Click the button below to load location data.</p>
+        </div>
+        
+        {/* Debug info - can be removed in production */}
+        <div className="mb-4 p-2 bg-gray-100 text-xs">
+          <div>Debug - Items Count: {locations?.items?.length || 0}</div>
+          <div>Debug - Total Items: {locations?.totalItems || 0}</div>
+          <div>Debug - Loading: {loading ? 'Yes' : 'No'}</div>
         </div>
         
         <div className="flex space-x-3">
@@ -348,6 +360,13 @@ const LocationManagement = () => {
         </div>
       </div>
       
+      {/* Debug info - can be removed in production */}
+      <div className="mb-4 p-2 bg-gray-100 text-xs">
+        <div>Debug - Items Count: {locations?.items?.length || 0}</div>
+        <div>Debug - Total Items: {locations?.totalItems || 0}</div>
+        <div>Debug - Loading: {loading ? 'Yes' : 'No'}</div>
+      </div>
+      
       {error && (
         <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
           <div className="flex">
@@ -363,7 +382,7 @@ const LocationManagement = () => {
         </div>
       )}
       
-      {loading ? (
+      {loading && !locations?.items?.length ? (
         <div className="flex justify-center py-12">
           <Spinner size="lg" />
         </div>
